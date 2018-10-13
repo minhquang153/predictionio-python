@@ -6,6 +6,8 @@ except ImportError:
     import queue as Queue
 import threading
 
+import requests
+
 try:
     import httplib
 except ImportError:
@@ -30,7 +32,6 @@ except NameError:
 
 # some constants
 MAX_RETRY = 1  # 0 means no retry
-
 
 # logger
 logger = None
@@ -157,52 +158,54 @@ class AsyncResponse(object):
     def set_error(self, error):
         self.error = error
 
+
 class AsyncResponse(object):
-  """Store the response of asynchronous request
+    """Store the response of asynchronous request
 
-  When get the response, user should check if error is None (which means no
-  Exception happens).
-  If error is None, then should check if the status is expected.
-  """
+    When get the response, user should check if error is None (which means no
+    Exception happens).
+    If error is None, then should check if the status is expected.
+    """
 
-  def __init__(self):
-    #: exception object if any happens
-    self.error = None
+    def __init__(self):
+        #: exception object if any happens
+        self.error = None
 
-    self.version = None
-    self.status = None
-    self.reason = None
-    #: Response header. str
-    self.headers = None
-    #: Response body. str
-    self.body = None
-    #: Jsonified response body. Remains None if conversion is unsuccessful.
-    self.json_body = None
-    #: Point back to the AsyncRequest object
-    self.request = None  
+        self.version = None
+        self.status = None
+        self.reason = None
+        #: Response header. str
+        self.headers = None
+        #: Response body. str
+        self.body = None
+        #: Jsonified response body. Remains None if conversion is unsuccessful.
+        self.json_body = None
+        #: Point back to the AsyncRequest object
+        self.request = None
 
-  def __str__(self):
-    return "e:%s v:%s s:%s r:%s h:%s b:%s" % (self.error, self.version,
-                          self.status, self.reason,
-                          self.headers, self.body)
+    def __str__(self):
+        return "e:%s v:%s s:%s r:%s h:%s b:%s" % (self.error, self.version,
+                                                  self.status, self.reason,
+                                                  self.headers, self.body)
 
-  def set_resp(self, version, status, reason, headers, body):
-    self.version = version
-    self.status = status
-    self.reason = reason
-    self.headers = headers
-    self.body = body
-    # Try to extract the json.
-    try:
-      self.json_body = json.loads(body.decode('utf8'))
-    except ValueError as ex:
-      self.json_body = None
+    def set_resp(self, version, status, reason, headers, body):
+        self.version = version
+        self.status = status
+        self.reason = reason
+        self.headers = headers
+        self.body = body
+        # Try to extract the json.
+        try:
+            self.json_body = json.loads(body.decode('utf8'))
+        except ValueError as ex:
+            self.json_body = None
 
-  def set_error(self, error):
-    self.error = error
+    def set_error(self, error):
+        self.error = error
 
-  def set_request(self, request):
-    self.request = request
+    def set_request(self, request):
+        self.request = request
+
 
 class PredictionIOHttpConnection(object):
     def __init__(self, host, https=True, timeout=5):
@@ -312,8 +315,7 @@ def connection_worker(host, request_queue, https=True, timeout=5, loop=True):
       loop: This worker function stays in a loop waiting for request
         For testing purpose only. should always be set to True.
     """
-
-    connect = PredictionIOHttpConnection(host, https, timeout)
+    # connect = PredictionIOHttpConnection(host, https, timeout)
 
     # loop waiting for job form request queue
     killed = not loop
@@ -325,31 +327,32 @@ def connection_worker(host, request_queue, https=True, timeout=5, loop=True):
         method = request.method
         if method == "GET":
             path = request.qpath
-            d = connect.request("GET", path)
+            r = requests.get(path)
         elif method == "POST":
-            path = request.path
+            headers = {'Content-type': 'application/json'}
             body = request.params
-            d = connect.request("POST", path, body)
-        elif method == "DELETE":
-            path = request.qpath
-            d = connect.request("DELETE", path)
-        elif method == "KILL":
-            # tell the thread to kill the connection
-            killed = True
-            d = AsyncResponse()
+            path = 'https://{}/{}'.format(host, request.path)
+            r = requests.post(path, headers=headers, data=json.dumps(body))
+        # elif method == "DELETE":
+        #     path = request.qpath
+        #     d = connect.request("DELETE", path)
+        # elif method == "KILL":
+        #     # tell the thread to kill the connection
+        #     killed = True
+        #     r = AsyncResponse()
         else:
-            d = AsyncResponse()
-            d.set_error(NotSupportMethodError(
+            r = AsyncResponse()
+            r.set_error(NotSupportMethodError(
                 "Don't Support the method %s" % method))
 
-        d.set_request(request)
-        request.set_response(d)
+        # r.set_request(request)
+        request.set_response(r)
         request_queue.task_done()
         if killed:
             break
 
     # end of while loop
-    connect.close()
+    # connect.close()
 
 
 class Connection(object):

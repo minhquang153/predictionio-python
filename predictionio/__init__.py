@@ -242,7 +242,7 @@ class EventClient(BaseClient):
     path = "/events.json?%s" % (urlencode(qparam), )
 
     request = AsyncRequest("POST", path, **data)
-    request.set_rfunc(self._acreate_resp)
+    #request.set_rfunc(self._acreate_resp)
     self._connection.make_request(request)
     return request
 
@@ -271,7 +271,7 @@ class EventClient(BaseClient):
     enc_event_id = quote(event_id, "") # replace special char with %xx
     path = "/events/%s.json" % (enc_event_id, )
     request = AsyncRequest("GET", path, **qparam)
-    request.set_rfunc(self._aget_resp)
+    # request.set_rfunc(self._aget_resp)
     self._connection.make_request(request)
     return request
 
